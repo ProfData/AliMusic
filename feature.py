@@ -34,12 +34,15 @@ def main():
     # result = pd.DataFrame(index=indexs, columns=columns)
     # result = result.fillna(0)
 
+    artistDailyRecord = {}
     #update the result table
     print 'Date from {} to {}'.format(startTimeStr, endTimeStr)
     delta = (endTime - startTime).days
     # create a dateframe with date, artist_id and play count
     for day in range(0, delta + 1):
+    #for day in range(0, 1):
         currentDate = datetime.strftime((startTime + timedelta(day)), "%Y%m%d")
+        print 'Processing day {}'.format(currentDate)
         intDate = int(currentDate)
         currentUsers = users.query('ds == [intDate]')
         record = [None] * len(songIdList)
@@ -52,17 +55,32 @@ def main():
         # create daily play counts of a artist
         artistRecord = [None] * len(artistIdList)
         for i in range(0, len(artistIdList)):
+        #for i in range(0, 1):
             artist = artistIdList[i]
             belongingSongs = songs[songs['artist_id'] == artist]
-            res = pd.concat([belongingSongs, recordDF], axis=1, join='inner')
+            res = pd.merge(belongingSongs, recordDF, on='song_id', how='inner')
             count = reduce(lambda x, y: x + y, res['count'].values)
             artistRecord[i] = count
+            dateArry = [currentDate] * belongingSongs.shape[0]
+            index = [0] * belongingSongs.shape[0]
+            for j in range (0, belongingSongs.shape[0]):
+                index[j] = day * belongingSongs.shape[0] + j
+
+            artistDailyDF = pd.DataFrame(index=index, data=zip(res['song_id'].values, res['count'].values), columns=['song_id', 'count'])
+            artistDailyDF.insert(0, 'ds', dateArry)
+            if artist in artistDailyRecord:
+                artistDailyRecord[artist] = pd.concat([artistDailyRecord[artist], artistDailyDF])
+            else:
+                artistDailyRecord[artist] = artistDailyDF
+
 
         artistRecordDF = pd.DataFrame(data=zip(artistIdList, artistRecord), columns=artistColumns)
         artistRecordDF.to_csv('{}_artist.csv'.format(currentDate))
         recordDF.to_csv('{}.csv'.format(currentDate))
 
 
+    for artist in artistIdList:
+        artistDailyRecord[artist].to_csv('{}.csv'.format(artist))
     #print songs.song_id
 
 
