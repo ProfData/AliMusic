@@ -6,7 +6,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
+from sklearn.pipeline import make_pipeline
 from datetime import datetime
 from datetime import timedelta
 
@@ -44,21 +45,40 @@ for artist in artists:
     dailyDF = records[records['ds'] == int(startTimeStr)]
     belonging_songs = list(set(dailyDF['song_id'].values))
     print 'Processing {} with {} songs'.format(artist, len(belonging_songs))
-    inputs = records[['ds', 'song_id']].values
-    values = records[['count']].values
-    train_size = len(inputs) * 0.8
-    inputs_train = inputs[:train_size]
-    inputs_test = inputs[train_size:]
-    values_train = values[:train_size]
-    values_test = values[train_size:]
-    # plot the original data
-    colors = cm.rainbow(np.linspace(0, 1, len(belonging_songs)))
-    for song, c in zip(belonging_songs, colors):
-        song_records = records[records['song_id'] == song][['ds', 'count']]
-        ds = map(lambda x: (datetime.strptime(str(x), '%Y%m%d') - startTime).days, song_records['ds'].values.T)
-        count = song_records['count'].values.T
-        plt.scatter(ds, count, color=c)
-        plt.plot(ds, count, color=c)
-    plt.xlabel("date")
-    plt.ylabel("count")
+    daily_count = records.groupby('ds')['count'].sum()
+    inputs_x = map(lambda x: (datetime.strptime(str(x), "%Y%m%d") - startTime).days, list(daily_count.index))
+    inputs_y = list(daily_count.values)
+    train_part = int(len(inputs_x) * 0.7)
+    x_plot = np.asarray(inputs_x)
+    X_predict = x_plot[:, np.newaxis]
+    X = x_plot[:train_part][:, np.newaxis]
+    Y = np.asarray(inputs_y[:train_part])
+    plt.scatter(X, Y, label="trainning points")
+    plt.scatter(x_plot[train_part:], np.asarray(inputs_y[train_part:]), label='validate points', marker='v')
+    for degree in [1, 2, 3]:
+        model = make_pipeline(PolynomialFeatures(degree), Ridge())
+        model.fit(X, Y)
+        y_plot = model.predict(X_predict)
+        plt.plot(x_plot, y_plot, label="degree {}".format(degree))
+
+    plt.legend(loc="lower left")
     plt.show()
+
+    # inputs = records[['ds', 'song_id']].values
+    # values = records[['count']].values
+    # train_size = len(inputs) * 0.8
+    # inputs_train = inputs[:train_size]
+    # inputs_test = inputs[train_size:]
+    # values_train = values[:train_size]
+    # values_test = values[train_size:]
+    # plot the original data
+    # colors = cm.rainbow(np.linspace(0, 1, len(belonging_songs)))
+    # for song, c in zip(belonging_songs, colors):
+    #     song_records = records[records['song_id'] == song][['ds', 'count']]
+    #     ds = map(lambda x: (datetime.strptime(str(x), '%Y%m%d') - startTime).days, song_records['ds'].values.T)
+    #     count = song_records['count'].values.T
+    #     plt.scatter(ds, count, color=c)
+    #     plt.plot(ds, count, color=c)
+    # plt.xlabel("date")
+    # plt.ylabel("count")
+    # plt.show()
