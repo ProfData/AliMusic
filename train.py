@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-from sklearn import datasets, linear_model
 import pandas as pd
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
 from datetime import datetime
 from datetime import timedelta
 
@@ -41,3 +44,21 @@ for artist in artists:
     dailyDF = records[records['ds'] == int(startTimeStr)]
     belonging_songs = list(set(dailyDF['song_id'].values))
     print 'Processing {} with {} songs'.format(artist, len(belonging_songs))
+    inputs = records[['ds', 'song_id']].values
+    values = records[['count']].values
+    train_size = len(inputs) * 0.8
+    inputs_train = inputs[:train_size]
+    inputs_test = inputs[train_size:]
+    values_train = values[:train_size]
+    values_test = values[train_size:]
+    # plot the original data
+    colors = cm.rainbow(np.linspace(0, 1, len(belonging_songs)))
+    for song, c in zip(belonging_songs, colors):
+        song_records = records[records['song_id'] == song][['ds', 'count']]
+        ds = map(lambda x: (datetime.strptime(str(x), '%Y%m%d') - startTime).days, song_records['ds'].values.T)
+        count = song_records['count'].values.T
+        plt.scatter(ds, count, color=c)
+        plt.plot(ds, count, color=c)
+    plt.xlabel("date")
+    plt.ylabel("count")
+    plt.show()
