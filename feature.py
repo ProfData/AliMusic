@@ -1,23 +1,29 @@
 #!/usr/bin/env python
 
 import numpy as np
+import os
 import pandas as pd
 from datetime import datetime
 from datetime import timedelta
 
 
-users = pd.read_csv(filepath_or_buffer="/home/frankfzw/Ali/users.csv", names=['user_id', 'song_id', 'gmt_create', 'action_type', 'ds'])
-songs = pd.read_csv(filepath_or_buffer='/home/frankfzw/Ali/songs.csv', names=['song_id', 'artist_id', 'publish_time', 'song_init_plays', 'language', 'gender'])
+file_prefix = '/home/frankfzw/Ali'
+
+
+raw_users = pd.read_csv(filepath_or_buffer="{}/mars_tianchi_user_actions.csv".format(file_prefix), names=['user_id', 'song_id', 'gmt_create', 'action_type', 'ds'])
+songs = pd.read_csv(filepath_or_buffer='{}/mars_tianchi_songs.csv'.format(file_prefix), names=['song_id', 'artist_id', 'publish_time', 'song_init_plays', 'language', 'gender'])
 
 
 def main():
     print "Ali Demo"
-    usersLen = len(users.index)
+    usersLen = len(raw_users.index)
     songsLen = len(songs.index)
-    print 'User Record Size: {}'.format(len(users.index))
-    print 'Songs Number: {}'.format(len(songs.index))
-    startTimeStr = users.loc[usersLen -1, 'ds']
-    endTimeStr = users.loc[0, 'ds']
+    print 'User Record Size: {}'.format(usersLen)
+    print 'Songs Number: {}'.format(songsLen)
+    users = raw_users.sort(['ds'])
+    days = set(users['ds'].values)
+    startTimeStr = days[0]
+    endTimeStr = days[len(days) - 1]
     startTime = datetime.strptime(str(startTimeStr), '%Y%m%d')
     endTime = datetime.strptime(str(endTimeStr), '%Y%m%d')
 
@@ -39,11 +45,10 @@ def main():
     print 'Date from {} to {}'.format(startTimeStr, endTimeStr)
     delta = (endTime - startTime).days
     # create a dateframe with date, artist_id and play count
-    for day in range(0, delta + 1):
+    for day in days:
     #for day in range(0, 1):
-        currentDate = datetime.strftime((startTime + timedelta(day)), "%Y%m%d")
-        print 'Processing day {}'.format(currentDate)
-        intDate = int(currentDate)
+        print 'Processing day {}'.format(day)
+        intDate = int(day)
         currentUsers = users.query('ds == [intDate]')
         record = [None] * len(songIdList)
         for i in range(0, len(songIdList)):
@@ -61,9 +66,9 @@ def main():
             res = pd.merge(belongingSongs, recordDF, on='song_id', how='inner')
             count = reduce(lambda x, y: x + y, res['count'].values)
             artistRecord[i] = count
-            dateArry = [currentDate] * belongingSongs.shape[0]
+            dateArry = [day] * belongingSongs.shape[0]
             index = [0] * belongingSongs.shape[0]
-            for j in range (0, belongingSongs.shape[0]):
+            for j in range(0, belongingSongs.shape[0]):
                 index[j] = day * belongingSongs.shape[0] + j
 
             artistDailyDF = pd.DataFrame(index=index, data=zip(res['song_id'].values, res['count'].values), columns=['song_id', 'count'])
@@ -75,12 +80,15 @@ def main():
 
 
         artistRecordDF = pd.DataFrame(data=zip(artistIdList, artistRecord), columns=artistColumns)
-        artistRecordDF.to_csv('{}_artist.csv'.format(currentDate))
-        recordDF.to_csv('{}.csv'.format(currentDate))
+        artistRecordDF.to_csv('{}/demo/data/{}_artist.csv'.format(file_prefix, day))
+        # artistRecordDF.to_csv(os.path.join(file_prefix, '{}_artist.csv'.format(currentDate)))
+        recordDF.to_csv('{}/demo/data/{}.csv'.format(file_prefix, day))
+        # recordDF.to_csv(os.path.join(file_prefix, '{}.csv'.format(currentDate)))
 
 
     for artist in artistIdList:
-        artistDailyRecord[artist].to_csv('{}.csv'.format(artist))
+        artistDailyRecord[artist].to_csv('{}/demo/data/{}.csv'.format(file_prefix, artist))
+        # artistDailyRecord[artist].to_csv(os.path.join(file_prefix, '{}.csv'.format(artist)))
     #print songs.song_id
 
 
