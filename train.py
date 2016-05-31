@@ -10,6 +10,9 @@ from sklearn import linear_model
 from sklearn.pipeline import Pipeline
 from datetime import datetime
 from datetime import timedelta
+from sklearn.metrics import mean_squared_error
+
+import math
 
 # read data from csv
 
@@ -41,37 +44,68 @@ artists = list(set(songs['artist_id'].values))
 
 # print songList
 
+def cost_function(ground_true, prediction):
+    
+    tmp = map(lambda x, y: pow(((float(x) - float(y)) / float(y)), 2), prediction, ground_true)
+    return pow(sum(tmp)/len(tmp), 0.5)
+
+
+model_dict = dict()
+
+
 for artist in artists:
     records = pd.read_csv(filepath_or_buffer='{}/demo/data/{}.csv'.format(file_prefix, artist))
-    dailyDF = records[records['ds'] == int(startTimeStr)]
-    belonging_songs = list(set(dailyDF['song_id'].values))
+    first_day = records[records['ds'] == int(startTimeStr)]
+    belonging_songs = list(set(first_day['song_id'].values))
     print 'Processing {} with {} songs'.format(artist, len(belonging_songs))
     daily_count = records.groupby('ds')['count'].sum()
-    inputs_x = map(lambda x: (datetime.strptime(str(x), "%Y%m%d") - startTime).days, list(daily_count.index))
-    inputs_y = list(daily_count.values)
-    train_part = int(len(inputs_x) * 0.7)
-    x_plot = np.asarray(inputs_x)
-    y_plot = np.asarray(inputs_y)
-    # X_predict = x_plot[:, np.newaxis]
-    X = x_plot[:train_part][:, np.newaxis]
-    Y = y_plot[:train_part]
-    X_validate = x_plot[train_part:][:, np.newaxis]
-    Y_validate = y_plot[train_part:]
-    # plt.scatter(X, Y, label="trainning points")
-    # plt.scatter(x_plot[train_part:], np.asarray(inputs_y[train_part:]), label='validate points', marker='v')
-    for degree in [1, 3, 5, 7, 9]:
-        # for alpha in np.linspace(1, 5, 10):
-        # ridge = linear_model.Ridge(alpha=alpha)
-        bayes = linear_model.BayesianRidge()
-        model = Pipeline([('poly', PolynomialFeatures(degree=degree)), ('linear', bayes)])
-        model.fit(X, Y)
-        score = model.score(X_validate, Y_validate)
-        print "\tScore of artist {} with degree {}: {}".format(artist, degree, score)
-        # y_plot = model.predict(X_predict)
-        # plt.plot(x_plot, y_plot, label="degree {}".format(degree))
+    days = list(daily_count.index)
 
-    # plt.legend(loc="lower left")
-    # plt.show()
+    inputs_x = map(lambda x: (datetime.strptime(str(x), "%Y%m%d") - startTime).days, list(days))
+    # train the model with single song_id
+    train_part = int(len(inputs_x) * 0.7)
+    for song in belonging_songs:
+        daily = records[records['song_id'] == song]
+        inputs_y = list(daily['count'].values)
+        x_plot = np.asarray(inputs_x)
+        y_plot = np.asarray(inputs_y)
+        # X_predict = x_plot[:, np.newaxis]
+        X = x_plot[:train_part][:, np.newaxis]
+        Y = y_plot[:train_part]
+        X_validate = x_plot[train_part:][:, np.newaxis]
+        Y_validate = y_plot[train_part:]
+        # plt.scatter(X, Y, label="trainning points")
+        # plt.scatter(X_validate, Y_validate, label='validate points', marker='v')
+        tmp = []
+        for degree in [1, 2, 3, 4, 5]:
+            # for alpha in np.linspace(1, 5, 10):
+            ridge = linear_model.Ridge()
+            lasso = linear_model.Lasso(alpha=0.1)
+            # bayes = linear_model.BayesianRidge()
+            model = Pipeline([('poly', PolynomialFeatures(degree=degree)), ('linear', ridge)])
+            model.fit(X, Y)
+            y_pred = model.predict(X_validate)
+            score = mean_squared_error(Y_validate, y_pred)
+            tmp.append((degree, score, model))
+            # y_pre = model.predict(x_plot[:, np.newaxis])
+            # plt.plot(x_plot, y_pre, label="degree {}".format(degree))
+        tmp.sort(key=lambda tup: tup[1])
+        # print "Song {} of Artist {}: model degree {}, score {}".format(song, artist, tmp[0][0], tmp[0][1])
+        model_dict[song] = tmp[0][2]
+        # plt.legend(loc="lower left")
+        # plt.show()
+
+    # predict
+    count = [0] * len(X_validate)
+    for song in belonging_songs:
+        song_count = model_dict[song].predict(X_validate)
+        count = map(lambda x, y: x + y, count, song_count)
+    
+    delta = len(inputs_x) - train_part
+    a = list(daily_count.values)[train_part - delta:train_part]
+    real_count = list(daily_count.values)[train_part:]
+    score = cost_function(real_count, a)
+    print "Artist {}: predict score {}".format(artist, score)
 
     # inputs = records[['ds', 'song_id']].values
     # values = records[['count']].values
@@ -91,3 +125,4 @@ for artist in artists:
     # plt.xlabel("date")
     # plt.ylabel("count")
     # plt.show()
+
