@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.mplot3d import Axes3D
+import csv
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
@@ -27,6 +28,11 @@ delta = (endTime - startTime).days
 songs = pd.read_csv(filepath_or_buffer='{}/mars_tianchi_songs.csv'.format(file_prefix), names=['song_id', 'artist_id', 'publish_time', 'song_init_plays', 'language', 'gender'])
 artists = list(set(songs['artist_id'].values))
 
+predict_start = '20150901'
+predict_end = '20151030'
+predict_start_time = datetime.strptime(str(predict_start), '%Y%m%d')
+predict_end_time = datetime.strptime(str(predict_end), '%Y%m%d')
+predict_delta = (predict_end_time - predict_start_time).days + 1
 
 
 # for day in range(0, delta + 1):
@@ -45,12 +51,12 @@ artists = list(set(songs['artist_id'].values))
 # print songList
 
 def cost_function(ground_true, prediction):
-    
     tmp = map(lambda x, y: pow(((float(x) - float(y)) / float(y)), 2), prediction, ground_true)
     return pow(sum(tmp)/len(tmp), 0.5)
 
 
 model_dict = dict()
+predict_res = dict()
 
 
 for artist in artists:
@@ -96,16 +102,21 @@ for artist in artists:
         # plt.show()
 
     # predict
-    count = [0] * len(X_validate)
+    count = [0] * predict_delta
+    predict_start_x = (predict_start_time - datetime.strptime(str(days[0]), '%Y%m%d')).days
+    print "Predict Artist {} from {}:{} to {}:{}".format(artist, predict_start, predict_start_x, predict_end, (predict_start_x + predict_delta - 1))
+    predict_input = range(predict_start_x, predict_start_x + predict_delta)
+    predict_input_x = np.asarray(predict_input)[:, np.newaxis]
     for song in belonging_songs:
-        song_count = model_dict[song].predict(X_validate)
+        song_count = model_dict[song].predict(predict_input_x)
         count = map(lambda x, y: x + y, count, song_count)
-    
-    delta = len(inputs_x) - train_part
-    a = list(daily_count.values)[train_part - delta:train_part]
-    real_count = list(daily_count.values)[train_part:]
-    score = cost_function(real_count, a)
-    print "Artist {}: predict score {}".format(artist, score)
+
+    predict_res[artist] = count
+    # delta = len(inputs_x) - train_part
+    # a = list(daily_count.values)[train_part - delta:train_part]
+    # real_count = list(daily_count.values)[train_part:]
+    # score = cost_function(real_count, a)
+    # print "Artist {}: predict score {}".format(artist, score)
 
     # inputs = records[['ds', 'song_id']].values
     # values = records[['count']].values
@@ -125,4 +136,21 @@ for artist in artists:
     # plt.xlabel("date")
     # plt.ylabel("count")
     # plt.show()
+
+
+# write result to file
+res = []
+for artist, record in predict_res.iteritems():
+    artist_array = [str(artist)] * len(record)
+    output_record = map(lambda x: int(x), record)
+    date_array = map(lambda x: str((predict_start_time + timedelta(days=x)).strftime('%Y%m%d')), range(0, len(record)))
+    res.extend(zip(artist_array, output_record, date_array))
+
+print "Start to write result"
+with open('{}/demo/res.csv'.format(file_prefix), 'wb') as f:
+    file_writer = csv.writer(f, delimiter=',')
+    header = ('artist_id', 'Plays', 'Ds')
+    file_writer.writerow(header)
+    for row in res:
+        file_writer.writerow(row)
 

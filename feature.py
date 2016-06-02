@@ -21,7 +21,8 @@ def main():
     print 'User Record Size: {}'.format(usersLen)
     print 'Songs Number: {}'.format(songsLen)
     users = raw_users.sort(['ds'])
-    days = set(users['ds'].values)
+    days = list(set(users['ds'].values))
+    days.sort()
     startTimeStr = days[0]
     endTimeStr = days[len(days) - 1]
     startTime = datetime.strptime(str(startTimeStr), '%Y%m%d')
@@ -52,7 +53,7 @@ def main():
         currentUsers = users.query('ds == [intDate]')
         record = [None] * len(songIdList)
         for i in range(0, len(songIdList)):
-            record[i] = currentUsers[currentUsers['song_id'] == songIdList[i]].shape[0]
+            record[i] = currentUsers[(currentUsers['song_id'] == songIdList[i]) & (currentUsers['action_type'] == 1)].shape[0]
         
         # create daily play record
         recordDF = pd.DataFrame(data=zip(songIdList, record), columns=columns)
